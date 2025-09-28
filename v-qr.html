@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Video to QR with Google Drive</title>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="https://unpkg.com/qr-code-styling@1.5.0/lib/qr-code-styling.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; background: #f4f4f4; padding: 20px; }
+    .container { background: #fff; padding: 20px; border-radius: 10px; max-width: 450px; margin: auto; box-shadow: 0 4px 10px rgba(0,0,0,0.1);}
+    h1 { color: #007bff; }
+    #qrcode-section { display: none; margin-top: 20px; }
+    #noteInput { width: 90%; padding: 10px; margin-top: 15px; border-radius: 6px; border: 1px solid #ccc; }
+    button { padding: 10px 20px; margin-top: 15px; background: #28a745; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;}
+    button:hover { background: #218838; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Video → QR + Drive</h1>
+    <p>Sign in with Google to save your videos & generate QR codes.</p>
+
+    <!-- Google Sign In -->
+    <div id="g_id_onload"
+         data-client_id="745466738973-t6n1qja58u0pk4o5raevtiueatd84f4o.apps.googleusercontent.com"
+         data-scope="openid email profile https://www.googleapis.com/auth/drive.file"
+         data-callback="onSignIn">
+    </div>
+    <div class="g_id_signin" data-type="standard"></div>
+
+    <input type="file" id="fileInput" accept="video/*" style="margin-top:20px;">
+    
+    <div id="qrcode-section">
+      <div id="qrcode"></div>
+      <input type="text" id="noteInput" placeholder="Add a note (e.g. Demo video)">
+      <button id="downloadQR">Download QR + Note</button>
+    </div>
+  </div>
+
+  <script>
+    let accessToken = null;
+    let qrCode;
+
+    // ✅ When Google Login Successful
+    function onSignIn(response) {
+      google.accounts.oauth2.initTokenClient({
+        client_id: "745466738973-t6n1qja58u0pk4o5raevtiueatd84f4o.apps.googleusercontent.com",
+        scope: "https://www.googleapis.com/auth/drive.file",
+        callback: (tokenResponse) => {
+          accessToken = tokenResponse.access_token;
+          alert("✅ Login Successful! Now upload a video.");
+        }
+      }).requestAccessToken();
+    }
+
+    // ✅ File Upload to Google Drive
+    document.getElementById("fileInput").addEventListener("change", async (event) => {
+      const file = event.target.files[0];
+      if (!file || !accessToken) {
+        alert("Please login and select a file.");
+        return;
+      }
+
+      const metadata = { name: file.name, mimeType: file.type };
+      const form = new FormData();
+      form.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
+      form.append("file", file);
+
+      const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
+        method: "POST",
+        headers: new Headers({ "Authorization": "Bearer " + accessToken }),
+        body: form
+      });
+
+      const data = await res.json();
+      if (data.id) {
+        const fileId = data.id;
+        const videoUrl = "https://drive.google.com/file/d/" + fileId + "/view?usp=sharing";
+        console.log("✅ Uploaded: ", videoUrl);
+
+        // Generate QR
+        qrCode = new QRCodeStyling({
+          width: 250,
+          height: 250,
+          data: videoUrl,
+          dotsOptions: { color: "#007bff", type: "rounded" },
+          backgroundOptions: { color: "#ffffff" }
+        });
+
+        const qrContainer = document.getElementById("qrcode");
+        qrContainer.innerHTML = "";
+        qrCode.append(qrContainer);
+        document.getElementById("qrcode-section").style.display = "block";
+      } else {
+        alert("Upload Failed!");
+      }
+    });
+
+    // ✅ Download QR + Note
+    document.getElementById("downloadQR").addEventListener("click", async () => {
+      if (!qrCode) return;
+      const note = document.getElementById("noteInput").value || "";
+      const blob = await qrCode.getRawData("png");
+      const qrImg = await createImageBitmap(blob);
+
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      const qrSize = 250;
+      const padding = 20;
+      const textHeight = note ? 40 : 0;
+
+      canvas.width = qrSize + padding * 2;
+      canvas.height = qrSize + padding * 2 + textHeight;
+
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(qrImg, padding, padding, qrSize, qrSize);
+
+      if (note) {
+        ctx.fillStyle = "#000";
+        ctx.font = "16px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText(note, canvas.width / 2, qrSize + padding * 1.8);
+      }
+
+      const a = document.createElement("a");
+      a.href = canvas.toDataURL("image/png");
+      a.download = "video-qr.png";
+      a.click();
+    });
+  </script>
+</body>
+  </html>
