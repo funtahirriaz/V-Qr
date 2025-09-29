@@ -76,7 +76,9 @@
       const data = await res.json();
       if (data.id) {
         const fileId = data.id;
-        const videoUrl = "https://drive.google.com/file/d/" + fileId + "/view?usp=sharing";
+
+        // ✅ Direct download link instead of preview link
+        const videoUrl = "https://drive.google.com/uc?export=download&id=" + fileId;
         console.log("✅ Uploaded: ", videoUrl);
 
         // Generate QR
@@ -130,5 +132,30 @@
       a.click();
     });
   </script>
+</body>      const ctx = canvas.getContext("2d");
+      const qrSize = 250;
+      const padding = 20;
+      const textHeight = note ? 40 : 0;
+
+      canvas.width = qrSize + padding * 2;
+      canvas.height = qrSize + padding * 2 + textHeight;
+
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(qrImg, padding, padding, qrSize, qrSize);
+
+      if (note) {
+        ctx.fillStyle = "#000";
+        ctx.font = "16px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText(note, canvas.width / 2, qrSize + padding * 1.8);
+      }
+
+      const a = document.createElement("a");
+      a.href = canvas.toDataURL("image/png");
+      a.download = "video-qr.png";
+      a.click();
+    });
+  </script>
 </body>
-  </html>
+</html>
